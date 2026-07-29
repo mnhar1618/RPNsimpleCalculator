@@ -1,4 +1,4 @@
-package simplecalculator;
+package simplecalculator_postfix;
 import java.lang.Math;
 import static java.lang.Double.NaN;
 public class Calculator {   
