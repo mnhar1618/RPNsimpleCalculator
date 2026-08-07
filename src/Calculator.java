@@ -1,6 +1,7 @@
-package simplecalculator_postfix;
+package RPNsimpleCalculator;
 import java.lang.Math;
 import static java.lang.Double.NaN;
+
 public class Calculator {   
     public enum BiOperator{
         equal,Add,Sub,Mult,Div,Mod,xpowy;
@@ -38,6 +39,12 @@ public class Calculator {
         
     }
 
+    public double Calculate(double num1, BiOperator op, double num2){
+        this.num1 = num1;
+        this.num2 = num2;
+        this.Op = op;
+        return Calculate();
+    }
 
     public double CalculateBi(uniOperator Op,double num){
         switch(Op){
@@ -77,6 +84,8 @@ public class Calculator {
                     throw new ArithmeticException();
                 }
                 return 1/num;
+            case abs:
+                return Math.abs(num);
             default:
                 return 0;
         }
