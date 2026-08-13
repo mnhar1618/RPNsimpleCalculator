@@ -1,116 +1,90 @@
 package RPNsimpleCalculator;
 import java.util.*;
 
-public class ReversedPolishNotation{
+public class ReversedPolishNotation {
 
-    public static int evaluate(String expression) throws Exception{
+    public static double evaluate(String expression) throws Exception {
+        Stack<Double> values = new Stack<>();
+        Stack<String> ops = new Stack<>();
+        List<String> output = new ArrayList<>();
 
-     Stack<Integer> stackD = new Stack<Integer>(); //stack for digits
-     Stack<Character> stackO = new Stack<Character>(); //stack for operators
-     List<String> output = new ArrayList(); //list for an RPN output 
-     Character operator;
-
-     String[] tokens = expression.split(" ");
-        //case where expression has parenthesis
-        for(String token : tokens){
-         if(token.matches("\\d+")){
-
-             stackD.push(Integer.parseInt(token)); //push integers to stackD
-         }
-         else{
-            stackO.push(token.charAt(0)); //push operator as a char in stackO
-            if (token.equals(")")){
-                while (stackO.peek() != '('){
-
-                
-            
-                    int y= stackD.pop();
-                    int x= stackD.pop();
-                    switch (stackO.peek()){
-                        case '+':
-                            stackD.push(x+y);
-                            break;
-
-                
-                        case '-':
-                         stackD.push(x-y);
-                         break;
-            
-                         case '*':
-                         stackD.push(x*y);
-                        break;
-                
-                        case '/':
-                             try{
-                                int z=x/y;
-                                stackD.push(z);
-                        
-                             }
-                            catch (ArithmeticException e){
-                                 System.out.println("Error: Division by zero is undifined.");
-                        
-                            }
-                            break;
-                    }
-                }
-                stackO.pop();
-                stackO.pop();
-                
-            }
-
-        //case where expression has no parenthesis
-         }
-        }
-        
-        for (String ch : tokens){
-            if (token.matches("\\d+")){
+        for (String token : expression.split("\\s+")) {
+            if (isNumber(token)) {
+                values.push(Double.parseDouble(token));
                 output.add(token);
-            }
-                else{
-                    stackO.push(ch.charAt(0));
-                    }
-                
-        }  
-
-        
-        while(!stackO.isEmpty()){
-            operator=stackO.pop();
-            output.add(String.valueOf(operator));
-        }
-        for (String s: output){
-            if (s.matches("\\d+")){
-                stackD.push(Integer.parseInt(s));
-            }
-            else{
-                int y= stackD.pop();
-                int x= stackD.pop();
-                switch (s){
-                    case "String.valueOf('+')":
-                        stackD.push(x+y);
-                        break;
-                    case "String.valueOf('-')":
-                        stackD.push(x-y);
-                        break;
-                    case "String.valueOf('*')":
-                        stackD.push(x*y);
-                        break;
-                    case "String.valueOf('/')":
-                        try{
-                            int z=x/y;
-                            stackD.push(z);
-                        }
-                        catch (ArithmeticException e){
-                            System.out.println("Error: Division by zero is undifined.");
-                        }
-                        break;
+            } else if (token.equals("(")) {
+                ops.push(token);
+            } else if (token.equals(")")) {
+                while (!ops.isEmpty() && !ops.peek().equals("(")) {
+                    applyOp(values, ops.pop(), output);
                 }
+                if (ops.isEmpty()) {
+                    throw new Exception("Mismatched parentheses");
+                }
+                ops.pop();
+            } else {
+                while (!ops.isEmpty() && !ops.peek().equals("(")
+                        && precedence(ops.peek()) >= precedence(token)
+                        && !(token.equals("^") && ops.peek().equals("^"))) {
+                    applyOp(values, ops.pop(), output);
+                }
+                ops.push(token);
             }
-            
         }
-        return stackD.pop();
+
+        while (!ops.isEmpty()) {
+            if (ops.peek().equals("(")) {
+                throw new Exception("Mismatched parentheses");
+            }
+            applyOp(values, ops.pop(), output);
+        }
+
+        System.out.println("RPN: " + String.join(" ", output));
+        return values.pop();
+    }
+
+    private static void applyOp(Stack<Double> values, String op, List<String> output) {
+        double b = values.pop();
+        double a = values.pop();
+        double result;
+        switch (op) {
+            case "+": result = a + b; break;
+            case "-": result = a - b; break;
+            case "*": result = a * b; break;
+            case "/":
+                if (b == 0) {
+                    throw new ArithmeticException("Division by zero");
+                }
+                result = a / b;
+                break;
+            case "%":
+                if (b == 0) {
+                    throw new ArithmeticException("Division by zero");
+                }
+                result = a % b;
+                break;
+            case "^": result = Math.pow(a, b); break;
+            default: throw new IllegalArgumentException("Unknown operator: " + op);
+        }
+        values.push(result);
+        output.add(op);
+    }
+
+    private static int precedence(String op) {
+        switch (op) {
+            case "+": case "-": return 1;
+            case "*": case "/": case "%": return 2;
+            case "^": return 3;
+            default: return 0;
+        }
+    }
+
+    private static boolean isNumber(String token) {
+        try {
+            Double.parseDouble(token);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }
-
-    
-
-

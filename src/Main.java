@@ -1,11 +1,10 @@
 package RPNsimpleCalculator;
 import java.util.*;
-import RPNsimpleCalculator.Calculator.BiOperator;
-import RPNsimpleCalculator.Calculator.uniOperator;
+import RPNsimpleCalculator.Calculator;
+//import RPNsimpleCalculator.Calculator.uniOperator;
 
 public class Main {
 
-    private final Stack<Double> stack = new Stack<Double>();
     private final Calculator calc = new Calculator();
     private final Scanner input = new Scanner(System.in);
 
@@ -15,9 +14,10 @@ public class Main {
     }
 
     private void run() {
-        System.out.println("RPN Calculator");
-        System.out.println("Type a number to push it, or an operator/function/command.");
-        System.out.println("Type 'help' for the list of commands.");
+        System.out.println("\t------RPN Calculator-------\n");
+        System.out.println("Type a normal arithmetic expression, e.g.  3 + 4 * (2 - 1)");
+        System.out.println("Functions: sin cos tan log ln exp sqr sqrt inv abs");
+        System.out.println("Type 'quit' to exit.\n");
         while (true) {
             System.out.print("> ");
             if (!input.hasNextLine()) {
@@ -27,66 +27,120 @@ public class Main {
             if (line.isEmpty()) {
                 continue;
             }
-            boolean quit = processLine(line);
-            if (quit) {
+            if (line.equalsIgnoreCase("quit") || line.equalsIgnoreCase("exit")) {
                 break;
             }
-            showStack();
+            process(line);
         }
         System.out.println("Bye!");
     }
 
-    private boolean processLine(String line) {
-        for (String token : line.split("\\s+")) {
-            if (isNumber(token)) {
-                stack.push(Double.parseDouble(token));
-                continue;
-            }
-            switch (token.toLowerCase()) {
-                case "+": case "-": case "*": case "/": case "%": case "^":
-                    applyBinary(token);
-                    break;
-                case "sin": case "cos": case "tan":
-                case "log": case "ln": case "exp":
-                case "sqr": case "sqrt": case "inv": case "abs":
-                    applyUnary(token);
-                    break;
-                case "stack":
-                    showStack();
-                    break;
-                case "swap":
-                    swap();
-                    break;
-                case "drop":
-                    if (!stack.isEmpty()) {
-                        stack.pop();
-                    } else {
-                        System.out.println("Stack is empty.");
-                    }
-                    break;
-                case "clear":
-                    stack.clear();
-                    System.out.println("Stack cleared.");
-                    break;
-                case "help":
-                    showHelp();
-                    break;
-                case "quit": case "exit":
-                    return true;
-                default:
-                    System.out.println("Unknown input: '" + token + "' (type 'help' for commands)");
-            }
+    private void process(String line) {
+        try {
+            List<String> rpn = shuntingYard(tokenize(line));
+            double result = evaluateRpn(rpn);
+            System.out.println("RPN:    " + String.join(" ", rpn));
+            System.out.println("Result: " + result + "\n");
+        } catch (ArithmeticException e) {
+            System.out.println("Error: operation is not defined for these values.\n");
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage() + "\n");
         }
-        return false;
     }
 
-    private void applyBinary(String symbol) {
-        if (stack.size() < 2) {
-            System.out.println("Error: need at least two numbers for '" + symbol + "'.");
-            return;
+    private static List<String> tokenize(String expr) {
+        List<String> tokens = new ArrayList<>();
+        int i = 0;
+        while (i < expr.length()) {
+            char c = expr.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (Character.isDigit(c)) {
+                StringBuilder sb = new StringBuilder();
+                while (i < expr.length() && (Character.isDigit(expr.charAt(i)) || expr.charAt(i) == '.')) {
+                    sb.append(expr.charAt(i++));
+                }
+                tokens.add(sb.toString());
+            } else if (Character.isLetter(c)) {
+                StringBuilder sb = new StringBuilder();
+                while (i < expr.length() && Character.isLetter(expr.charAt(i))) {
+                    sb.append(expr.charAt(i++));
+                }
+                String word = sb.toString().toLowerCase();
+                if (!isFunction(word)) {
+                    throw new IllegalArgumentException("Unknown function: '" + word + "'");
+                }
+                tokens.add(word);
+            } else if (c == '(' || c == ')') {
+                tokens.add(String.valueOf(c));
+                i++;
+            } else if ("+-*/%^".indexOf(c) >= 0) {
+                tokens.add(String.valueOf(c));
+                i++;
+            } else {
+                throw new IllegalArgumentException("Unexpected character: '" + c + "'");
+            }
         }
-        double num2 = stack.pop();
-        double num1 = stack.pop();
+        return tokens;
+    }
+
+    private static List<String> shuntingYard(List<String> tokens) {
+        Deque<String> operators = new ArrayDeque<>();
+        List<String> output = new ArrayList<>();
+        for (String token : tokens) {
+            if (isNumber(token)) {
+                output.add(token);
+            } else if (isFunction(token)) {
+                operators.push(token);
+            } else if (token.equals("(")) {
+                operators.push(token);
+            } else if (token.equals(")")) {
+                while (!operators.isEmpty() && !operators.peek().equals("(")) {
+                    output.add(operators.pop());
+                }
+                if (operators.isEmpty()) {
+                    throw new IllegalArgumentException("Mismatched parentheses");
+                }
+                operators.pop();
+                if (!operators.isEmpty() && isFunction(operators.peek())) {
+                    output.add(operators.pop());
+                }
+            } else {
+                while (!operators.isEmpty() && !operators.peek().equals("(")
+                        && (precedence(operators.peek()) > precedence(token)
+                            || (precedence(operators.peek()) == precedence(token) && !token.equals("^")))) {
+                    output.add(operators.pop());
+                }
+                operators.push(token);
+            }
+        }
+        while (!operators.isEmpty()) {
+            if (operators.peek().equals("(")) {
+                throw new IllegalArgumentException("Mismatched parentheses");
+            }
+            output.add(operators.pop());
+        }
+        return output;
+    }
+
+    private double evaluateRpn(List<String> rpn) {
+        Deque<Double> stack = new ArrayDeque<>();
+        for (String token : rpn) {
+            if (isNumber(token)) {
+                stack.push(Double.parseDouble(token));
+            } else if (isFunction(token)) {
+                double a = stack.pop();
+                stack.push(applyUnary(token, a));
+            } else {
+                double b = stack.pop();
+                double a = stack.pop();
+                stack.push(applyBinary(token, a, b));
+            }
+        }
+        return stack.pop();
+    }
+
+    private double applyBinary(String symbol, double num1, double num2) {
         BiOperator op;
         switch (symbol) {
             case "+": op = BiOperator.Add; break;
@@ -95,21 +149,12 @@ public class Main {
             case "/": op = BiOperator.Div; break;
             case "%": op = BiOperator.Mod; break;
             case "^": op = BiOperator.xpowy; break;
-            default: return;
+            default: throw new IllegalArgumentException("Unknown operator: '" + symbol + "'");
         }
-        try {
-            stack.push(calc.Calculate(num1, op, num2));
-        } catch (ArithmeticException e) {
-            System.out.println("Error: " + symbol + " is not defined for these values.");
-        }
+        return calc.Calculate(num1, op, num2);
     }
 
-    private void applyUnary(String symbol) {
-        if (stack.isEmpty()) {
-            System.out.println("Error: need a number on the stack for '" + symbol + "'.");
-            return;
-        }
-        double num = stack.pop();
+    private double applyUnary(String symbol, double num) {
         uniOperator op;
         switch (symbol) {
             case "sin": op = uniOperator.sin; break;
@@ -122,36 +167,9 @@ public class Main {
             case "sqrt": op = uniOperator.sqrt; break;
             case "inv": op = uniOperator.inv; break;
             case "abs": op = uniOperator.abs; break;
-            default: return;
+            default: throw new IllegalArgumentException("Unknown function: '" + symbol + "'");
         }
-        try {
-            stack.push(calc.CalculateBi(op, num));
-        } catch (ArithmeticException e) {
-            System.out.println("Error: " + symbol + " is not defined for " + fmt(num) + ".");
-        }
-    }
-
-    private void swap() {
-        if (stack.size() < 2) {
-            System.out.println("Error: need at least two numbers to swap.");
-            return;
-        }
-        double a = stack.pop();
-        double b = stack.pop();
-        stack.push(a);
-        stack.push(b);
-    }
-
-    private void showStack() {
-        if (stack.isEmpty()) {
-            System.out.println("Stack: (empty)");
-            return;
-        }
-        System.out.print("Stack:");
-        for (int i = stack.size() - 1; i >= 0; i--) {
-            System.out.print("  " + fmt(stack.get(i)));
-        }
-        System.out.println();
+        return calc.CalculateBi(op, num);
     }
 
     private static boolean isNumber(String token) {
@@ -163,22 +181,23 @@ public class Main {
         }
     }
 
-    private static String fmt(double value) {
-        if (Double.isInfinite(value) || Double.isNaN(value)) {
-            return String.valueOf(value);
+    private static boolean isFunction(String token) {
+        switch (token) {
+            case "sin": case "cos": case "tan":
+            case "log": case "ln": case "exp":
+            case "sqr": case "sqrt": case "inv": case "abs":
+                return true;
+            default:
+                return false;
         }
-        if (value == Math.floor(value)) {
-            return String.valueOf((long) value);
-        }
-        String s = String.format("%.10g", value);
-        return s;
     }
 
-    private void showHelp() {
-        System.out.println("Numbers: type any number to push it onto the stack.");
-        System.out.println("Operators:  +  -  *  /  %  ^   (use two top numbers)");
-        System.out.println("Functions:  sin  cos  tan  log  ln  exp  sqr  sqrt  inv  abs");
-        System.out.println("Commands:   stack  swap  drop  clear  help  quit");
-        System.out.println("Example:   5  3  *  2  ^   ->  10 ^ 2 = 100");
+    private static int precedence(String token) {
+        switch (token) {
+            case "+": case "-": return 1;
+            case "*": case "/": case "%": return 2;
+            case "^": return 3;
+            default: return 0;
+        }
     }
 }
