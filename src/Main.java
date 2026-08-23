@@ -1,7 +1,8 @@
 package RPNsimpleCalculator;
 import java.util.*;
 import RPNsimpleCalculator.Calculator;
-//import RPNsimpleCalculator.Calculator.uniOperator;
+import RPNsimpleCalculator.Calculator.uniOperator;
+import RPNsimpleCalculator.Calculator.BiOperator;
 
 public class Main {
 
